@@ -34,7 +34,6 @@ public class Tuple implements Serializable {
         this.tupleDesc = td;
         length = td.numFields();
         Iterator<TupleDesc.TDItem> it = td.iterator();
-
         fields = new Field[length];
 
 

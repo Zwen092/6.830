@@ -15,17 +15,17 @@ package simpledb.common;
 public class Debug {
   private static final int DEBUG_LEVEL;
   static {
-      String debug = System.getProperty("simpledb.common.Debug");
-      if (debug == null) {
-          // No system property = disabled
-          DEBUG_LEVEL = -1;
-      } else if (debug.length() == 0) {
-          // Empty property = level 0
-          DEBUG_LEVEL = 0;
-      } else {
-          DEBUG_LEVEL = Integer.parseInt(debug);
-      }
-      //DEBUG_LEVEL = 1;
+//      String debug = System.getProperty("simpledb.common.Debug");
+//      if (debug == null) {
+//          // No system property = disabled
+//          DEBUG_LEVEL = -1;
+//      } else if (debug.length() == 0) {
+//          // Empty property = level 0
+//          DEBUG_LEVEL = 0;
+//      } else {
+//          DEBUG_LEVEL = Integer.parseInt(debug);
+//      }
+      DEBUG_LEVEL = 1;
   }
 
 

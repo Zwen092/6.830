@@ -37,12 +37,14 @@ public class JoinTest extends SimpleDbTestBase {
                     7, 8 });
     this.scan2 = TestUtil.createTupleList(width2,
         new int[] { 1, 2, 3,
+                    1, 3, 4,
                     2, 3, 4,
                     3, 4, 5,
                     4, 5, 6,
                     5, 6, 7 });
     this.eqJoin = TestUtil.createTupleList(width1 + width2,
         new int[] { 1, 2, 1, 2, 3,
+                    1, 2, 1, 3, 4,
                     3, 4, 3, 4, 5,
                     5, 6, 5, 6, 7 });
     this.gtJoin = TestUtil.createTupleList(width1 + width2,
@@ -99,6 +101,7 @@ public class JoinTest extends SimpleDbTestBase {
     op.open();
     gtJoin.open();
     TestUtil.matchAllTuples(gtJoin, op);
+
   }
 
   /**

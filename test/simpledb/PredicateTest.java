@@ -18,6 +18,10 @@ public class PredicateTest extends SimpleDbTestBase{
     int[] vals = new int[] { -1, 0, 1 };
 
     for (int i : vals) {
+      /**
+       * i = 0
+       * compare the the 0-th item in the passed-in tuple with the specified field
+       */
       Predicate p = new Predicate(0, Predicate.Op.EQUALS, TestUtil.getField(i));
       assertFalse(p.filter(Utility.getHeapTuple(i - 1)));
       assertTrue(p.filter(Utility.getHeapTuple(i)));
@@ -27,6 +31,7 @@ public class PredicateTest extends SimpleDbTestBase{
     for (int i : vals) {
       Predicate p = new Predicate(0, Predicate.Op.GREATER_THAN,
           TestUtil.getField(i));
+      System.out.println(p);
       assertFalse(p.filter(Utility.getHeapTuple(i - 1)));
       assertFalse(p.filter(Utility.getHeapTuple(i)));
       assertTrue(p.filter(Utility.getHeapTuple(i + 1)));

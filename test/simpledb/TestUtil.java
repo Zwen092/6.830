@@ -136,9 +136,11 @@ public class TestUtil {
             Tuple expectedTup = expected.next();
             matched = false;
             actual.rewind();
+            System.out.println("expected tuple: " + expectedTup);
 
             while (actual.hasNext()) {
                 Tuple next = actual.next();
+                System.out.println("actual tuple: " + next);
                 if (compareTuples(expectedTup, next)) {
                     matched = true;
                     break;
