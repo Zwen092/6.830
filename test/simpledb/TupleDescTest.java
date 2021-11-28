@@ -161,14 +161,15 @@ public class TupleDescTest extends SimpleDbTestBase {
         assertNotEquals(singleInt, new Object());
 
         assertEquals(singleInt, singleInt);
-        assertEquals(singleInt, singleInt2);
-        assertEquals(singleInt2, singleInt);
-        assertEquals(intString, intString);
+        assertEquals(singleInt, singleInt2); //buggy
+        assertEquals(singleInt2, singleInt); //buggy
+        assertEquals(intString, intString); //buggy
 
         assertNotEquals(singleInt, intString);
         assertNotEquals(singleInt2, intString);
         assertNotEquals(intString, singleInt);
         assertNotEquals(intString, singleInt2);
+        //the following two are buggy
         assertEquals(intString, intString2);
         assertEquals(intString2, intString);
     }
@@ -179,5 +180,6 @@ public class TupleDescTest extends SimpleDbTestBase {
     public static junit.framework.Test suite() {
         return new JUnit4TestAdapter(TupleDescTest.class);
     }
+
 }
 

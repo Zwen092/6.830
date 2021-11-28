@@ -25,7 +25,9 @@ public class Debug {
       } else {
           DEBUG_LEVEL = Integer.parseInt(debug);
       }
+      //DEBUG_LEVEL = 1;
   }
+
 
   private static final int DEFAULT_LEVEL = 0;
 

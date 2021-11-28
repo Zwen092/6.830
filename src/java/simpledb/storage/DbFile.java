@@ -76,7 +76,7 @@ public interface DbFile {
     /**
      * Returns a unique ID used to identify this DbFile in the Catalog. This id
      * can be used to look up the table via {@link Catalog#getDatabaseFile} and
-     * {@link Catalog#getTupleDesc}.
+     * {@link Catalog#getTupleDesc}.\
      * <p>
      * Implementation note:  you will need to generate this tableid somewhere,
      * ensure that each HeapFile has a "unique id," and that you always

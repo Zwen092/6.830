@@ -191,6 +191,8 @@ public class AggregateTest extends SimpleDbTestBase {
     TestUtil.matchAllTuples(min, op);
   }
 
+
+
   /**
    * JUnit suite target
    */

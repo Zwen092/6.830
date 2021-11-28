@@ -1,5 +1,6 @@
 package simpledb.storage;
 
+import org.omg.IOP.TAG_ORB_TYPE;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Debug;
@@ -21,9 +22,10 @@ public class HeapPage implements Page {
 
     final HeapPageId pid;
     final TupleDesc td;
-    final byte[] header;
+    public final byte[] header;
     final Tuple[] tuples;
     final int numSlots;
+
 
     byte[] oldData;
     private final Byte oldDataLock= (byte) 0;
@@ -71,21 +73,19 @@ public class HeapPage implements Page {
     /** Retrieve the number of tuples on this page.
         @return the number of tuples on this page
     */
-    private int getNumTuples() {        
-        // some code goes here
-        return 0;
 
+    private int getNumTuples() {
+        return Math.floorDiv(BufferPool.getPageSize() * 8, (td.getSize() * 8 + 1));
     }
+
+
 
     /**
      * Computes the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      */
-    private int getHeaderSize() {        
-        
-        // some code goes here
-        return 0;
-                 
+    public int getHeaderSize() {
+        return (int)Math.ceil(getNumTuples() / 8.0);
     }
     
     /** Return a view of this page before it was modified
@@ -117,8 +117,7 @@ public class HeapPage implements Page {
      * @return the PageId associated with this page.
      */
     public HeapPageId getId() {
-    // some code goes here
-    throw new UnsupportedOperationException("implement this");
+        return pid;
     }
 
     /**
@@ -283,21 +282,44 @@ public class HeapPage implements Page {
         return null;      
     }
 
+    public int getNumSlots() {
+        return numSlots;
+    }
     /**
      * Returns the number of empty slots on this page.
      */
     public int getNumEmptySlots() {
-        // some code goes here
-        return 0;
+        //iterate through the header to see how many bits are 0
+        int total = 0;
+        for (int i = 0; i < header.length; i++) {
+            total += getZero(header[i]);
+        }
+        return total;
+    }
+
+    private int getZero(byte a) {
+        int total = 0;
+        for (int i = 0; i < 8; i++) {
+            if (a % 2 == 0) total++;
+            a >>= 1;
+        }
+        return total;
     }
 
     /**
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
-        // some code goes here
-        return false;
+        //504 - 50 >= 484? false
+        int total = 0;
+        for (int j = 0; j < header.length; j++) {
+            total += 8 - getZero(header[j]);
+        }
+        return i < total;
     }
+
+
+
 
     /**
      * Abstraction to fill or clear a slot on this page.
@@ -313,8 +335,16 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return null;
+        List<Tuple> tupleList = new ArrayList<>();
+        for (Tuple tuple : tuples) {
+            if (tuple != null) {
+                tupleList.add(tuple);
+            }
+        }
+
+        return tupleList.iterator();
     }
+
 
 }
 

@@ -23,11 +23,20 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Catalog {
 
+    private HashMap<String, DbFile> nameTracker;
+    private HashMap<Integer, DbFile> idTracker;
+    private HashMap<Integer, String> idKeyTracker;
+    private HashMap<Integer, String> idNameTracker;
+
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
+        nameTracker = new HashMap<>();
+        idTracker = new HashMap<>();
+        idKeyTracker = new HashMap<>();
+        idNameTracker = new HashMap<>();
         // some code goes here
     }
 
@@ -41,7 +50,12 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // some code goes here
+        nameTracker.put(name, file);
+        idTracker.put(file.getId(), file);
+        idKeyTracker.put(file.getId(), pkeyField);
+        idNameTracker.put(file.getId(), name);
+
+
     }
 
     public void addTable(DbFile file, String name) {
@@ -65,7 +79,12 @@ public class Catalog {
      */
     public int getTableId(String name) throws NoSuchElementException {
         // some code goes here
-        return 0;
+        if (nameTracker.containsKey(name)) {
+            return nameTracker.get(name).getId();
+        } else {
+            throw new NoSuchElementException();
+        }
+
     }
 
     /**
@@ -76,7 +95,11 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here
-        return null;
+        if (idTracker.containsKey(tableid)) {
+            return idTracker.get(tableid).getTupleDesc();
+        } else {
+            throw new NoSuchElementException();
+        }
     }
 
     /**
@@ -86,13 +109,19 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        if (idTracker.containsKey(tableid)) {
+            return idTracker.get(tableid);
+        } else {
+            throw new NoSuchElementException();
+        }
     }
 
     public String getPrimaryKey(int tableid) {
-        // some code goes here
-        return null;
+        if (idKeyTracker.containsKey(tableid)) {
+            return idKeyTracker.get(tableid);
+        } else {
+            throw new NoSuchElementException();
+        }
     }
 
     public Iterator<Integer> tableIdIterator() {
@@ -101,8 +130,8 @@ public class Catalog {
     }
 
     public String getTableName(int id) {
-        // some code goes here
-        return null;
+        //search table name from its id
+        return idNameTracker.get(id);
     }
     
     /** Delete all tables from the catalog */

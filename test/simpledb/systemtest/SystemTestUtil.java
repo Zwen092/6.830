@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
+import com.sun.javafx.iio.common.SmoothMinifier;
 import org.junit.Assert;
 
 import simpledb.common.*;
@@ -16,6 +17,7 @@ import simpledb.execution.SeqScan;
 import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+import sun.java2d.pipe.SpanIterator;
 
 public class SystemTestUtil {
     public static final TupleDesc SINGLE_INT_DESCRIPTOR =
@@ -123,6 +125,7 @@ public class SystemTestUtil {
             }
         }
 
+
         iterator.open();
         while (iterator.hasNext()) {
             Tuple t = iterator.next();
@@ -133,7 +136,9 @@ public class SystemTestUtil {
                 Assert.fail("expected tuples does not contain: " + t);
             }
         }
+
         iterator.close();
+
 
         if (!copy.isEmpty()) {
             StringBuilder msg = new StringBuilder("expected to find the following tuples:\n");

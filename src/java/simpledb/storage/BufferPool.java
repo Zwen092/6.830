@@ -9,6 +9,7 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -33,6 +34,18 @@ public class BufferPool {
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
 
+    private final Page[] pages;
+
+    private Map<PageId, Integer> pageTable;
+
+    private LinkedList<Integer> freeList;
+
+    private final Map<PageId, Page> bufferPool = new ConcurrentHashMap<>();
+
+    int numPages;
+
+    //I may use a map to track the
+
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -40,6 +53,14 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
+        this.numPages = numPages;
+        pages = new Page[numPages];
+        pageTable = new HashMap<>();
+        freeList = new LinkedList<>();
+        //all the pages in page[] is usable
+        for (int i = 0; i < numPages; i++) {
+            freeList.add(i);
+        }
     }
     
     public static int getPageSize() {
@@ -56,6 +77,11 @@ public class BufferPool {
     	BufferPool.pageSize = DEFAULT_PAGE_SIZE;
     }
 
+    private int findFreeSlot() {
+        return freeList.removeFirst();
+    }
+
+
     /**
      * Retrieve the specified page with the associated permissions.
      * Will acquire a lock and may block if that lock is held by another
@@ -71,10 +97,36 @@ public class BufferPool {
      * @param pid the ID of the requested page
      * @param perm the requested permissions on the page
      */
-    public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
+    public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        //if presents, return it
+//        if (pageTable.containsKey(pid)) {
+//            return pages[pageTable.get(pid)];
+//        }
+//        //not present, fetch it and add to this bufferPool and return
+//        DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+//        Page page = databaseFile.readPage(pid);
+//        int index = findFreeSlot();
+//        pageTable.put(pid, index);
+//        pages[index] = page;
+//        return page;
+
+        Page page = bufferPool.get(pid);
+        if (page == null) {
+            DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+            page = dbFile.readPage(pid);
+            if (page != null) {
+                if (bufferPool.size() >= this.numPages) {
+                    this.evictPage();
+                }
+                if (perm == Permissions.READ_WRITE) {
+                    page.markDirty(true, tid);
+                }
+                bufferPool.put(pid, page);
+            }
+        }
+        return page;
     }
 
     /**

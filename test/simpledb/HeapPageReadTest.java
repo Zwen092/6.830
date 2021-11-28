@@ -110,12 +110,30 @@ public class HeapPageReadTest extends SimpleDbTestBase {
         assertEquals(484, page.getNumEmptySlots());
     }
 
+    @Test public void getNumTuples() throws Exception {
+        HeapPage page = new HeapPage(pid, EXAMPLE_DATA);
+        System.out.println(page.getNumEmptySlots());
+        /**
+         * 0 - 503 个slot
+         * 0 - 19 used
+         *
+         *
+         *
+         */
+
+
+    }
+
     /**
      * Unit test for HeapPage.isSlotUsed()
      */
     @Test public void getSlot() throws Exception {
         HeapPage page = new HeapPage(pid, EXAMPLE_DATA);
-
+        /**
+         * -1 -1 15
+         * 8 + 8 +
+         *
+         */
         for (int i = 0; i < 20; ++i)
             assertTrue(page.isSlotUsed(i));
 
