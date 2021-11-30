@@ -16,8 +16,8 @@ public class Join extends Operator {
     private static final long serialVersionUID = 1L;
 
     private final JoinPredicate joinPredicate;
-    private final OpIterator child1;
-    private final OpIterator child2;
+    private OpIterator child1;
+    private OpIterator child2;
     private final TupleDesc tupleDesc1;
     private final TupleDesc tupleDesc2;
 
@@ -159,7 +159,8 @@ public class Join extends Operator {
 
     @Override
     public void setChildren(OpIterator[] children) {
-
+        child1 = children[0];
+        child2 = children[1];
     }
 
 }

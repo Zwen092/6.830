@@ -43,6 +43,7 @@ public class AggregateTest extends SimpleDbTestBase {
                     3, 4,
                     3, 6,
                     5, 7 });
+    //afield 1 gfild 0
     this.scan2 = TestUtil.createTupleList(width1,
         new Object[] { 1, "a",
                     1, "a",
@@ -51,6 +52,7 @@ public class AggregateTest extends SimpleDbTestBase {
                     3, "a",
                     3, "a",
                     5, "a" });
+    //afield 1, gfield 0
     this.scan3 = TestUtil.createTupleList(width1,
         new Object[] { "a", 2,
                     "a", 4,
@@ -86,6 +88,13 @@ public class AggregateTest extends SimpleDbTestBase {
                     3, 3,
                     5, 1 });
 
+  }
+
+  @Test public void groupNameAndAggName() throws Exception {
+    Aggregate op = new Aggregate(scan3, 1, 0,
+            Aggregator.Op.SUM);
+    String expectedGroupName = "STRING_TYPE";
+    assertEquals(expectedGroupName, op.groupFieldName());
   }
 
   /**
@@ -137,7 +146,7 @@ public class AggregateTest extends SimpleDbTestBase {
   }
 
   /**
-   * Unit test for Aggregate.getNext() using a count aggregate with string types
+   * Unit test for Aggregate.getNext() using a sum aggregate with string types
    */
   @Test public void sumStringGroupBy() throws Exception {
     Aggregate op = new Aggregate(scan3, 1, 0,
@@ -146,6 +155,8 @@ public class AggregateTest extends SimpleDbTestBase {
     sumstring.open();
     TestUtil.matchAllTuples(sumstring, op);
   }
+
+
 
   /**
    * Unit test for Aggregate.getNext() using a sum aggregate

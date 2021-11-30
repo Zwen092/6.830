@@ -42,7 +42,10 @@ public class IntegerAggregatorTest extends SimpleDbTestBase {
       { 1, 2 },
       { 1, 6 },
       { 1, 12 },
-      { 1, 12, 3, 2 }
+      { 1, 12, 3, 2 },
+            { 1, 12, 3, 6 },
+            { 1, 12, 3, 12 },
+            { 1, 12, 3, 12, 5, 7 }
     };
 
     this.min = new int[][] {
@@ -80,6 +83,16 @@ public class IntegerAggregatorTest extends SimpleDbTestBase {
       it.open();
       TestUtil.matchAllTuples(TestUtil.createTupleList(width1, step), it);
     }
+//    while (scan1.hasNext()) {
+//      agg.mergeTupleIntoGroup(scan1.next());
+//    }
+//    OpIterator iterator = agg.iterator();
+//    iterator.open();
+//    while (iterator.hasNext()) {
+//      System.out.println(iterator.next());
+//    }
+
+
   }
 
   /**
