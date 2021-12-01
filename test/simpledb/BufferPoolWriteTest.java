@@ -19,6 +19,7 @@ import simpledb.storage.*;
 import simpledb.systemtest.SystemTestUtil;
 import static org.junit.Assert.*;
 import junit.framework.JUnit4TestAdapter;
+import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
@@ -28,8 +29,9 @@ public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
     static class HeapFileDuplicates extends HeapFile {
 
     	private final int duplicates;
-    	
-    	public HeapFileDuplicates(File f, TupleDesc td, int duplicates) {
+
+
+		public HeapFileDuplicates(File f, TupleDesc td, int duplicates) {
     		super(f, td);
     		this.duplicates = duplicates;
     	}
@@ -42,14 +44,23 @@ public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
     		List<Page> dirtypages = new ArrayList<>();
     		for(int i = 0; i < duplicates; i++) {
     			// create a blank page
-    			BufferedOutputStream bw = new BufferedOutputStream(new FileOutputStream(super.getFile(), true));
-                byte[] emptyData = HeapPage.createEmptyPageData();
-                bw.write(emptyData);
-                bw.close();
+
     			HeapPage p = new HeapPage(new HeapPageId(super.getId(), super.numPages() - 1),
     					HeapPage.createEmptyPageData());
     	        p.insertTuple(t);
-    			dirtypages.add(p);
+				BufferedOutputStream bw = new BufferedOutputStream(new FileOutputStream(super.getFile(), true));
+				//byte[] emptyData = HeapPage.createEmptyPageData();
+				byte[] data = p.getPageData();
+				//bw.write(emptyData);
+				bw.write(data);
+				bw.close();
+    	        //super.writePage(p);
+//				try {
+//					super.insertTuple(tid, t);
+//				} catch (TransactionAbortedException e) {
+//					e.printStackTrace();
+//				}
+				//dirtypages.add(p);
     		}
     		return dirtypages;
     	}
@@ -125,12 +136,14 @@ public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
     
     @Test public void handleManyDirtyPages() throws Exception {
     	HeapFileDuplicates hfd = new HeapFileDuplicates(empty.getFile(), empty.getTupleDesc(), 10);
+		System.out.println(empty.getFile().length());
     	Database.getCatalog().addTable(hfd, SystemTestUtil.getUUID());
     	Database.getBufferPool().insertTuple(tid, hfd.getId(), Utility.getHeapTuple(1, 2));
     	
     	// there should now be 10 tuples (on 10 different pages) in the buffer pool
     	DbFileIterator it = hfd.iterator(tid);
     	it.open();
+		System.out.println(empty.getFile().length());
     	
     	int count = 0;
     	while(it.hasNext()) {

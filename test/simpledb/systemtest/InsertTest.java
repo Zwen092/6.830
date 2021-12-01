@@ -37,13 +37,17 @@ public class InsertTest extends SimpleDbTestBase {
 //        Query q = new Query(insOp, tid);
         insOp.open();
         boolean hasResult = false;
+        int a = 0;
         while (insOp.hasNext()) {
             Tuple tup = insOp.next();
             assertFalse(hasResult);
             hasResult = true;
             assertEquals(SystemTestUtil.SINGLE_INT_DESCRIPTOR, tup.getTupleDesc());
+            //???
             assertEquals(sourceRows, ((IntField) tup.getField(0)).getValue());
+            a++;
         }
+        System.out.println(a);
         assertTrue(hasResult);
         insOp.close();
 

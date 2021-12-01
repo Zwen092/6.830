@@ -27,6 +27,7 @@ public class HeapFile implements DbFile {
 
     final File f;
     final TupleDesc td;
+    //private int totalPages;
 
 
     /**
@@ -39,6 +40,7 @@ public class HeapFile implements DbFile {
     public HeapFile(File f, TupleDesc td) {
         this.f = f;
         this.td = td;
+      //  totalPages = 0;
     }
 
     /**
@@ -111,14 +113,23 @@ public class HeapFile implements DbFile {
                 }
             }
         }
-
         return heapPage;
     }
 
     // see DbFile.java for javadocs
     public void writePage(Page page) throws IOException {
-        // some code goes here
-        // not necessary for lab1
+        PageId pageId = page.getId();
+        int pageNo = pageId.getPageNumber();
+        int offset = pageNo * BufferPool.getPageSize();
+        byte[] pageData = page.getPageData();
+
+        RandomAccessFile raf = new RandomAccessFile(f, "rw");
+        raf.seek(offset);
+        raf.write(pageData);
+        raf.close();
+
+        page.markDirty(false, null);
+
     }
 
     /**
@@ -128,6 +139,7 @@ public class HeapFile implements DbFile {
         long currentPageNo = (f.length() - 1 + BufferPool.getPageSize())
                 / BufferPool.getPageSize();
         return (int) currentPageNo;
+
         //
     }
     public int numPages2() {
@@ -137,22 +149,48 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
-        return null;
-        // not necessary for lab1
+        ArrayList<Page> pagesModified = new ArrayList<>();
+        for (int i = 0; i < numPages(); i++) {
+            PageId pageId = new HeapPageId(getId(), i);
+            HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_ONLY);
+            if (page.getNumEmptySlots() > 0) {
+                page = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
+                page.markDirty(true, tid);
+                page.insertTuple(t);
+                pagesModified.add(page);
+                return pagesModified;
+            }
+        }
+
+        //no more space in the existed pages or the are no page
+        //create new page class and add it to the physical file
+        HeapPageId pageId = new HeapPageId(getId(), numPages());
+        byte[] emptyPage = new byte[BufferPool.getPageSize()];
+        HeapPage newPage = new HeapPage(pageId, emptyPage);
+        newPage.markDirty(true, tid);
+        newPage.insertTuple(t);
+
+        writePage(newPage);
+        pagesModified.add(newPage);
+        return pagesModified;
     }
 
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
-        // some code goes here
-        return null;
-        // not necessary for lab1
+        ArrayList<Page> ans = new ArrayList<>();
+        PageId pageId = t.getRecordId().getPageId();
+        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_ONLY);
+        page.deleteTuple(t);
+        page.markDirty(true, tid);
+        ans.add(page);
+        return ans;
     }
 
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
-        return new HeapFileIterator(this, tid);
+        //return new HeapFileIterator(this, tid);
+        return new HeapFileIterator1(numPages(), tid, Permissions.READ_WRITE);
     }
 
     private class HeapFileIterator extends AbstractDbFileIterator {
@@ -233,75 +271,75 @@ public class HeapFile implements DbFile {
     }
 
 
-//    private class HeapFileIterator1 extends AbstractDbFileIterator {
-//
-//        private TransactionId tid;
-//        private Permissions permissions;
-//
-//        HeapFileIterator1(int pageNo, TransactionId tid, Permissions permissions) {
-//            this.pageNo = pageNo;
-//            this.tid = tid;
-//            this.permissions = permissions;
-//        }
-//
-//        private int pageNo;
-//        private int iterIndex = 0;
-//        private Iterator<Tuple> iterator;
-//
-//        @Override
-//        public void open() throws DbException, TransactionAbortedException {
-//            iterIndex = 0;
-//            iterator = this.getHeapPageIterator(iterIndex);
-//            if (iterator == null) {
-//                throw new DbException("iterator is null");
-//            }
-//        }
-//
-//        private Iterator<Tuple> getHeapPageIterator(int pageNo)
-//                throws DbException, TransactionAbortedException {
-//            PageId pageId = new HeapPageId(getId(), pageNo);
-//            /*
-//                这里获取页面的权限值得商讨
-//                1. 如果使用READ_ONLY, 会导致并发事务的系统单元测试挂掉，无解
-//                2. 使用READ_WRITE，抢占该页数据，避免并发写覆盖的情况，为了通过单元测试。
-//             */
-//            Page page = Database.getBufferPool().getPage(tid, pageId, permissions);
-//            return ((HeapPage) page).iterator();
-//        }
-//
-//        @Override
-//        protected Tuple readNext() throws DbException, TransactionAbortedException {
-//            if (iterator == null || iterIndex >= pageNo) {
-//                return null;
-//            }
-//            while (!iterator.hasNext()) {
-//                iterIndex++;
-//                if (iterIndex < pageNo) {
-//                    iterator = this.getHeapPageIterator(iterIndex);
-//                } else {
-//                    break;
-//                }
-//            }
-//
-//            if (iterIndex == pageNo) {
-//                return null;
-//            } else {
-//                return iterator.next();
-//            }
-//        }
-//
-//        @Override
-//        public void rewind() throws DbException, TransactionAbortedException {
-//            close();
-//            open();
-//        }
-//
-//        @Override
-//        public void close() {
-//            super.close();
-//            this.iterIndex = pageNo;
-//        }
-//    }
+    private class HeapFileIterator1 extends AbstractDbFileIterator {
+
+        private TransactionId tid;
+        private Permissions permissions;
+
+        HeapFileIterator1(int pageNo, TransactionId tid, Permissions permissions) {
+            this.pageNo = pageNo;
+            this.tid = tid;
+            this.permissions = permissions;
+        }
+
+        private int pageNo;
+        private int iterIndex = 0;
+        private Iterator<Tuple> iterator;
+
+        @Override
+        public void open() throws DbException, TransactionAbortedException {
+            iterIndex = 0;
+            iterator = this.getHeapPageIterator(iterIndex);
+            if (iterator == null) {
+                throw new DbException("iterator is null");
+            }
+        }
+
+        private Iterator<Tuple> getHeapPageIterator(int pageNo)
+                throws DbException, TransactionAbortedException {
+            PageId pageId = new HeapPageId(getId(), pageNo);
+            /*
+                这里获取页面的权限值得商讨
+                1. 如果使用READ_ONLY, 会导致并发事务的系统单元测试挂掉，无解
+                2. 使用READ_WRITE，抢占该页数据，避免并发写覆盖的情况，为了通过单元测试。
+             */
+            Page page = Database.getBufferPool().getPage(tid, pageId, permissions);
+            return ((HeapPage) page).iterator();
+        }
+
+        @Override
+        protected Tuple readNext() throws DbException, TransactionAbortedException {
+            if (iterator == null || iterIndex >= pageNo) {
+                return null;
+            }
+            while (!iterator.hasNext()) {
+                iterIndex++;
+                if (iterIndex < pageNo) {
+                    iterator = this.getHeapPageIterator(iterIndex);
+                } else {
+                    break;
+                }
+            }
+
+            if (iterIndex == pageNo) {
+                return null;
+            } else {
+                return iterator.next();
+            }
+        }
+
+        @Override
+        public void rewind() throws DbException, TransactionAbortedException {
+            close();
+            open();
+        }
+
+        @Override
+        public void close() {
+            super.close();
+            this.iterIndex = pageNo;
+        }
+    }
 
 
 

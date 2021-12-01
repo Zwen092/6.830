@@ -105,7 +105,6 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
     @Test public void deleteTuple() throws Exception {
         HeapPage page = new HeapPage(pid, HeapPageReadTest.EXAMPLE_DATA);
         int free = page.getNumEmptySlots();
-
         // first, build a list of the tuples on the page.
         Iterator<Tuple> it = page.iterator();
         LinkedList<Tuple> tuples = new LinkedList<>();
@@ -121,6 +120,8 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
             deleted += 2;
             assertEquals(free + deleted, page.getNumEmptySlots());
         }
+
+
 
         // now, the page should be empty.
         try {

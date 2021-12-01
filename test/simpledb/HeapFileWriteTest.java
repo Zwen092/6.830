@@ -12,6 +12,8 @@ import simpledb.storage.*;
 import simpledb.systemtest.SystemTestUtil;
 import simpledb.transaction.TransactionId;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 
 public class HeapFileWriteTest extends TestUtil.CreateHeapFile {
@@ -29,10 +31,22 @@ public class HeapFileWriteTest extends TestUtil.CreateHeapFile {
         Database.getBufferPool().transactionComplete(tid);
     }
 
+    @Test public void myTest() {
+        File file = null;
+        try {
+            file = File.createTempFile("empty", ".dat");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println(file.getAbsolutePath());
+        System.out.println(file.getName());
+    }
+
     /**
      * Unit test for HeapFile.addTuple()
      */
     @Test public void addTuple() throws Exception {
+        // we should be able to add 504 tuples on an empty page.
         // we should be able to add 504 tuples on an empty page.
         for (int i = 0; i < 504; ++i) {
             empty.insertTuple(tid, Utility.getHeapTuple(i, 2));

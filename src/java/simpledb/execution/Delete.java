@@ -20,6 +20,11 @@ public class Delete extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+
+    private final TransactionId transactionId;
+    private final OpIterator child;
+    private final TupleDesc tupleDesc;
+    private boolean hasNoMoreElements;
     /**
      * Constructor specifying the transaction that this delete belongs to as
      * well as the child to read from.
@@ -30,24 +35,34 @@ public class Delete extends Operator {
      *            The child operator from which to read tuples for deletion
      */
     public Delete(TransactionId t, OpIterator child) {
-        // some code goes here
+        this.transactionId = t;
+        this.child = child;
+        this.hasNoMoreElements = false;
+
+        Type[] types = new Type[1];
+        types[0] = Type.INT_TYPE;
+        this.tupleDesc = new TupleDesc(types);
     }
 
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return tupleDesc;
     }
 
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        super.open();
+        child.open();
+        hasNoMoreElements = false;
     }
 
     public void close() {
-        // some code goes here
+        super.close();
+        child.close();
+        hasNoMoreElements = true;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        close();
+        open();
     }
 
     /**
@@ -60,8 +75,22 @@ public class Delete extends Operator {
      * @see BufferPool#deleteTuple
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        if (hasNoMoreElements) {
+            return null;
+        }
+        Tuple deleteResult = new Tuple(tupleDesc);
+        int records = 0;
+        while (child.hasNext()) {
+            try {
+                Database.getBufferPool().deleteTuple(transactionId, child.next());
+                records++;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        deleteResult.setField(0, new IntField(records));
+        hasNoMoreElements = true;
+        return deleteResult;
     }
 
     @Override

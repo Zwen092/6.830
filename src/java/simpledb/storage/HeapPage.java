@@ -1,5 +1,6 @@
 package simpledb.storage;
 
+import jdk.nashorn.internal.runtime.RewriteException;
 import org.omg.IOP.TAG_ORB_TYPE;
 import simpledb.common.Database;
 import simpledb.common.DbException;
@@ -25,6 +26,8 @@ public class HeapPage implements Page {
     public final byte[] header;
     final Tuple[] tuples;
     final int numSlots;
+    private TransactionId transactionId;
+    private boolean isDirty;
 
 
     byte[] oldData;
@@ -248,8 +251,17 @@ public class HeapPage implements Page {
      * @param t The tuple to delete
      */
     public void deleteTuple(Tuple t) throws DbException {
-        // some code goes here
-        // not necessary for lab1
+        RecordId recordId = t.getRecordId();
+        PageId pageId = recordId.getPageId();
+        int tupleNo = recordId.getTupleNumber();
+        if (!pageId.equals(pid) || !isSlotUsed(tupleNo)) {
+            throw new DbException("This tuple is not on this page or tuple slot is already empty");
+        }
+        //make the slot from filled to empty -> markSlotUsed(int tupleNo, boolean value)
+        //make the corresponding tuple[tupleNo] -> null
+        markSlotUsed(tupleNo, false);
+        tuples[tupleNo] = null;
+
     }
 
     /**
@@ -260,8 +272,24 @@ public class HeapPage implements Page {
      * @param t The tuple to add.
      */
     public void insertTuple(Tuple t) throws DbException {
-        // some code goes here
-        // not necessary for lab1
+        TupleDesc tupleDesc = t.getTupleDesc();
+        if (!tupleDesc.equals(td) || getNumEmptySlots() == 0) {
+            throw new DbException("the page is full or tupleDesc mismatch");
+        }
+//        int tupleNo = t.getRecordId().getTupleNumber();
+//        RecordId newId = new RecordId(this.pid, getNumTuples() - getNumEmptySlots());
+//        t.setRecordId(newId);
+//        markSlotUsed(tupleNo, true);
+//        tuples[tupleNo] = t;
+        for (int i = 0; i < getNumTuples(); i++) {
+            if (!isSlotUsed(i)) {
+                markSlotUsed(i, true);
+                t.setRecordId(new RecordId(this.pid, i));
+                //this.getNumTuples() - this.getNumEmptySlots()
+                tuples[i] = t;
+                return;
+            }
+        }
     }
 
     /**
@@ -269,17 +297,21 @@ public class HeapPage implements Page {
      * that did the dirtying
      */
     public void markDirty(boolean dirty, TransactionId tid) {
-        // some code goes here
-	// not necessary for lab1
+//        isDirty = dirty;
+//        transactionId = tid;
+        if (dirty) {
+            transactionId = tid;
+        } else {
+            transactionId = null;
+        }
     }
 
     /**
      * Returns the tid of the transaction that last dirtied this page, or null if the page is not dirty
      */
     public TransactionId isDirty() {
-        // some code goes here
-	// Not necessary for lab1
-        return null;      
+        //return isDirty ? transactionId : null;
+        return transactionId;
     }
 
     public int getNumSlots() {
@@ -311,11 +343,14 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         //504 - 50 >= 484? false
-        int total = 0;
-        for (int j = 0; j < header.length; j++) {
-            total += 8 - getZero(header[j]);
-        }
-        return i < total;
+//        int total = 0;
+//        for (int j = 0; j < header.length; j++) {
+//            total += 8 - getZero(header[j]);
+//        }
+//        return i < total;
+        int quotient = i / 8;
+        int remainder = i % 8;
+        return ((header[quotient]&(1<<remainder))>>remainder) == 1;
     }
 
 
@@ -325,8 +360,31 @@ public class HeapPage implements Page {
      * Abstraction to fill or clear a slot on this page.
      */
     private void markSlotUsed(int i, boolean value) {
-        // some code goes here
-        // not necessary for lab1
+        /**
+         * first we should find which header we should modify
+         * i = 20
+         * i / 8 = 2...4 the 2ed header
+         * we set 00001111 to 00000111
+         * which is 31 -> 15
+         * or we set 00001111 -> 00001101
+         * 00001111 &~(1<<x)
+         * which is 31 -> 8 + 4 + 1 = 13
+         *
+         *
+         */
+        //find bits
+        int quotient = i / 8;
+        int remainder = i % 8;
+        if (!value) {
+            //set bit to 0
+            int mask = ~(1 << remainder);
+            header[quotient] &= mask;
+        } else {
+            //set bit to 1
+            int mask = (1 << remainder);
+            header[quotient] |= mask;
+        }
+
     }
 
     /**
