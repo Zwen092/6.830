@@ -34,15 +34,23 @@ public class BufferPool {
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
 
-    private final Page[] pages;
+    private static class dNode {
+        PageId pageId;
+        Page page;
+        dNode prev;
+        dNode next;
+        dNode () {}
+        dNode (PageId id, Page page) {
+            this.pageId = id;
+            this.page = page;
+        }
+    }
 
-    private Map<PageId, Integer> pageTable;
-
-    private LinkedList<Integer> freeList;
-
-    private final Map<PageId, Page> bufferPool = new ConcurrentHashMap<>();
-
+    private final Map<PageId, dNode> bufferPool = new ConcurrentHashMap<>();
+    int size;
+    dNode sentinel = new dNode();
     int numPages;
+
 
     //I may use a map to track the
 
@@ -52,15 +60,10 @@ public class BufferPool {
      * @param numPages maximum number of pages in this buffer pool.
      */
     public BufferPool(int numPages) {
-        // some code goes here
         this.numPages = numPages;
-        pages = new Page[numPages];
-        pageTable = new HashMap<>();
-        freeList = new LinkedList<>();
-        //all the pages in page[] is usable
-        for (int i = 0; i < numPages; i++) {
-            freeList.add(i);
-        }
+        this.size = 0;
+        sentinel.next = sentinel;
+        sentinel.prev = sentinel;
     }
     
     public static int getPageSize() {
@@ -77,9 +80,6 @@ public class BufferPool {
     	BufferPool.pageSize = DEFAULT_PAGE_SIZE;
     }
 
-    private int findFreeSlot() {
-        return freeList.removeFirst();
-    }
 
 
     /**
@@ -100,33 +100,53 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        //if presents, return it
-//        if (pageTable.containsKey(pid)) {
-//            return pages[pageTable.get(pid)];
-//        }
-//        //not present, fetch it and add to this bufferPool and return
-//        DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
-//        Page page = databaseFile.readPage(pid);
-//        int index = findFreeSlot();
-//        pageTable.put(pid, index);
-//        pages[index] = page;
-//        return page;
-
-        Page page = bufferPool.get(pid);
-        if (page == null) {
+        dNode node = bufferPool.get(pid);
+        if (node == null) {
             DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
-            page = dbFile.readPage(pid);
-            if (page != null) {
-                if (bufferPool.size() >= this.numPages) {
-                    this.evictPage();
-                }
-                if (perm == Permissions.READ_WRITE) {
-                    page.markDirty(true, tid);
-                }
-                bufferPool.put(pid, page);
+            Page page = dbFile.readPage(pid);
+//            if (page != null) {
+////                if (bufferPool.size() >= this.numPages) {
+////                    this.evictPage();
+////                }
+//////                if (perm == Permissions.READ_WRITE) {
+//////                    page.markDirty(true, tid);
+//////                }
+////                dNode newNode =
+////                bufferPool.put(pid, page);
+//            }
+            node = new dNode(pid, page);
+            bufferPool.put(pid, node);
+            addToHead(node);
+            size++;
+            if (size > numPages) {
+                evictPage();
             }
         }
-        return page;
+        moveToHead(node);
+        return node.page;
+    }
+    private void addToHead(dNode node) {
+        node.prev = sentinel;
+        node.next = sentinel.next;
+        sentinel.next.prev = node;
+        sentinel.next = node;
+    }
+
+    private void moveToHead(dNode node) {
+        //move this node to head
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+        node.prev = sentinel;
+        node.next = sentinel.next;
+        sentinel.next.prev = node;
+        sentinel.next = node;
+    }
+
+    private dNode removeTail() {
+        dNode tail = sentinel.prev;
+        tail.prev.next = tail.next;
+        sentinel.prev = tail.prev;
+        return tail;
     }
 
     /**
@@ -189,14 +209,14 @@ public class BufferPool {
      */
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-//        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
-//        dbFile.insertTuple(tid, t);
         ArrayList<Page> dirtyPages = (ArrayList<Page>) Database.getCatalog().getDatabaseFile(tableId)
                 .insertTuple(tid, t);
 
         for (Page dirtyPage : dirtyPages) {
             dirtyPage.markDirty(true, tid);
-            this.bufferPool.put(dirtyPage.getId(), dirtyPage);
+            dNode node = new dNode(dirtyPage.getId(), dirtyPage);
+            this.bufferPool.put(dirtyPage.getId(), node);
+            addToHead(node);
         }
     }
 
@@ -218,13 +238,11 @@ public class BufferPool {
         RecordId recordId = t.getRecordId();
         PageId pageId = recordId.getPageId();
         HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(pageId.getTableId());
-        ArrayList<Page> pages = heapFile.deleteTuple(tid, t);
-        for (Page page : pages) {
-            page.markDirty(true, tid);
-            bufferPool.put(pageId, page);
-        }
-//        HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
-//        heapPage.deleteTuple(t);
+        heapFile.deleteTuple(tid, t);
+//        for (Page page : pages) {
+//            page.markDirty(true, tid);
+//            bufferPool.put(pageId, new dNode(page.getId(), page));
+//        }
     }
 
     /**
@@ -235,6 +253,12 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
+        for (Map.Entry<PageId, dNode> group : bufferPool.entrySet()) {
+            Page page = group.getValue().page;
+            if (page.isDirty() != null) {
+                this.flushPage(group.getKey());
+            }
+        }
 
     }
 
@@ -249,31 +273,67 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        if (pid == null) {
+            return;
+        }
+        bufferPool.remove(pid);
     }
 
     /**
      * Flushes a certain page to disk
      * @param pid an ID indicating the page to flush
      */
-    private synchronized  void flushPage(PageId pid) throws IOException {
+    private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        Page pageToBeFlushed = bufferPool.get(pid).page;
+        TransactionId tid = pageToBeFlushed.isDirty();
+        if (pageToBeFlushed != null && tid != null) {
+            Page before = pageToBeFlushed.getBeforeImage();
+            // flushPage本身无事务控制，不应该调用setBeforeImage
+            // pageToBeFlushed.setBeforeImage();
+            Database.getLogFile().logWrite(tid, before, pageToBeFlushed);
+            Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(pageToBeFlushed);
+        }
     }
 
     /** Write all pages of the specified transaction to disk.
      */
-    public synchronized  void flushPages(TransactionId tid) throws IOException {
+    public synchronized void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+
     }
 
     /**
      * Discards a page from the buffer pool.
      * Flushes the page to disk to ensure dirty pages are updated on disk.
+     *
+     * I should evict the Least Recently Used page
+     * every time the bufferPool interact with a page
+     * the page should be to the front of this dlinkedList
+     * when evict, evict the Least Recently Used page and flush it to disk if it is dirty
      */
-    private synchronized  void evictPage() throws DbException {
-        // some code goes here
-        // not necessary for lab1
+    private synchronized void evictPage() throws DbException {
+
+        dNode tail = removeTail();
+        bufferPool.remove(tail.pageId);
+        size--;
+        if (tail.page.isDirty() != null) {
+            try {
+                flushPage(tail.pageId);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     *
+     *
+     */
+    private void put(PageId pageId, Page page) {
+
     }
 
 }
