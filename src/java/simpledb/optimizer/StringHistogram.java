@@ -23,9 +23,10 @@ public class StringHistogram {
     }
 
     /**
-     * Convert a string to an integer, with the property that if the return
-     * value(s1) < return value(s2), then s1 < s2
+     * Convert a string to an integer, with the property that if the
+     * return value(s1) < return value(s2), then s1 < s2
      */
+    //todo:: change it to private after test
     private int stringToInt(String s) {
         int i;
         int v = 0;
@@ -61,7 +62,7 @@ public class StringHistogram {
         return stringToInt("");
     }
 
-    /** Add a new value to thte histogram */
+    /** Add a new value to the histogram */
     public void addValue(String s) {
         int val = stringToInt(s);
         hist.addValue(val);

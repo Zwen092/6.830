@@ -11,7 +11,7 @@ import java.util.List;
 public class IntHistogram {
 
 
-    private final ArrayList[] buckets;
+    private final ArrayList<Integer>[] buckets;
     private final int min;
     private final int max;
     private final int bucketRange;
@@ -76,6 +76,7 @@ public class IntHistogram {
      * @param v Value to add to the histogram
      */
     public void addValue(int v) {
+        if (v > max || v < min) return;
     	int index = chooseBucket(v);
     	buckets[index].add(v);
     	numTuples++;
@@ -107,6 +108,9 @@ public class IntHistogram {
 
     }
     private double eq(int v) {
+        if (v < min || v > max) {
+            return 0;
+        }
         int index = chooseBucket(v);
         return (double)buckets[index].size()/bucketRange/numTuples;
     }
@@ -159,7 +163,7 @@ public class IntHistogram {
     }
 
     private double GreaterThanOrEquals(int v) {
-        if (v < min) {
+        if (v <= min) {
             return 1;
         }
         if (v > max) {
@@ -172,7 +176,7 @@ public class IntHistogram {
         if (v < min) {
             return 0;
         }
-        if (v > max) {
+        if (v >= max) {
             return 1;
         }
         return LessThan(v) + eq(v);
@@ -202,5 +206,14 @@ public class IntHistogram {
     public String toString() {
         // some code goes here
         return null;
+    }
+
+    public void iterate() {
+        for (int i = 0; i < buckets.length; i++) {
+            for (int j : buckets[i]) {
+                System.out.print("buckets[i]: " + j);
+                System.out.println();
+            }
+        }
     }
 }

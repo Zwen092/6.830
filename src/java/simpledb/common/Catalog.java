@@ -84,7 +84,6 @@ public class Catalog {
         } else {
             throw new NoSuchElementException();
         }
-
     }
 
     /**

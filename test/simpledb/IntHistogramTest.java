@@ -5,6 +5,7 @@ import org.junit.Assert;
 
 import simpledb.execution.Predicate.Op;
 import simpledb.optimizer.IntHistogram;
+import simpledb.optimizer.StringHistogram;
 
 public class IntHistogramTest {
 
@@ -177,4 +178,5 @@ public class IntHistogramTest {
 		Assert.assertTrue(h.estimateSelectivity(Op.NOT_EQUALS, 3) < 0.001);
 		Assert.assertTrue(h.estimateSelectivity(Op.NOT_EQUALS, 8) > 0.01);
 	}
+
 }

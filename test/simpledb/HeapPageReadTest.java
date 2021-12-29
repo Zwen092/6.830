@@ -112,6 +112,7 @@ public class HeapPageReadTest extends SimpleDbTestBase {
 
     @Test public void getNumTuples() throws Exception {
         HeapPage page = new HeapPage(pid, EXAMPLE_DATA);
+        System.out.println(page.getNumSlots());
         System.out.println(page.getNumEmptySlots());
         /**
          * 0 - 503 个slot

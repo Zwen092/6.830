@@ -25,8 +25,6 @@ public class SeqScan implements OpIterator {
     int tableId;
     String tableAlias;
 
-    DbFile f;
-    DbFileIterator it;
 
     private DbFile dbFile;
     private DbFileIterator dbFileIterator;

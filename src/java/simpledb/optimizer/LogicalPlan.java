@@ -488,7 +488,7 @@ public class LogicalPlan {
         Map<String, TableStats> tableMap = new HashMap<>();
 
         // create the tables, associate them with the data files
-        // and tell the catalog about the schema  the tables.
+        // and tell the catalog about the schema the tables.
         HeapFile table1 = new HeapFile(new File("some_data_file1.dat"), td);
         Database.getCatalog().addTable(table1, "t1");
         ts = new TableStats(table1.getId(), 1);

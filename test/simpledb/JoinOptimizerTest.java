@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
+import com.sun.codemodel.internal.JJavaName;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,9 +16,7 @@ import simpledb.execution.Predicate;
 import simpledb.optimizer.JoinOptimizer;
 import simpledb.optimizer.LogicalJoinNode;
 import simpledb.optimizer.TableStats;
-import simpledb.storage.BufferPool;
-import simpledb.storage.HeapFile;
-import simpledb.storage.HeapFileEncoder;
+import simpledb.storage.*;
 import simpledb.systemtest.SimpleDbTestBase;
 import simpledb.systemtest.SystemTestUtil;
 import simpledb.transaction.TransactionAbortedException;
@@ -301,15 +300,18 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         HeapFile emp = SystemTestUtil.createRandomHeapFile(6, 100000, null,
                 empTuples, "c");
         Database.getCatalog().addTable(emp, "emp");
+        System.out.println(emp.getTupleDesc());
 
         List<List<Integer>> deptTuples = new ArrayList<>();
         HeapFile dept = SystemTestUtil.createRandomHeapFile(3, 1000, null,
                 deptTuples, "c");
+        System.out.println(dept.getTupleDesc());
         Database.getCatalog().addTable(dept, "dept");
 
         List<List<Integer>> hobbyTuples = new ArrayList<>();
         HeapFile hobby = SystemTestUtil.createRandomHeapFile(6, 1000, null,
                 hobbyTuples, "c");
+        System.out.println(hobby.getTupleDesc());
         Database.getCatalog().addTable(hobby, "hobby");
 
         List<List<Integer>> hobbiesTuples = new ArrayList<>();
@@ -329,6 +331,20 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         stats.put("hobbies",
                 new TableStats(Database.getCatalog().getTableId("hobbies"),
                         IO_COST));
+        double cost1 = stats.get("emp").estimateScanCost();
+        double cost2 = stats.get("dept").estimateScanCost();
+        int card1 = stats.get("emp").estimateTableCardinality(0.1);
+        int card2 = stats.get("dept").estimateTableCardinality(1.0);
+        System.out.println("emp cost:" + stats.get("emp").estimateScanCost());
+        System.out.println("emp card:" + stats.get("emp").estimateTableCardinality(0.1));
+        System.out.println("dept cost:" + stats.get("dept").estimateScanCost());
+        System.out.println("dept card:" + stats.get("dept").estimateTableCardinality(1.0));
+        System.out.println("hobbies cost:" + stats.get("hobbies").estimateScanCost());
+        System.out.println("hobbies card:" + stats.get("hobbies").estimateTableCardinality(0.1));
+        System.out.println("hobby cost:" + stats.get("hobby").estimateScanCost());
+        System.out.println("hobby card:" + stats.get("hobby").estimateTableCardinality(1.0));
+
+
 
         // Note that your code shouldn't re-compute selectivities.
         // If you get statistics numbers, even if they're wrong (which they are
@@ -349,20 +365,56 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         // semantically means the same thing.
         nodes.add(new LogicalJoinNode("hobbies", "hobby", "c1", "c0",
                 Predicate.Op.EQUALS));
+        LogicalJoinNode joinNode = new LogicalJoinNode("hobbies", "hobby", "c1", "c0",
+                Predicate.Op.EQUALS);
         nodes.add(new LogicalJoinNode("emp", "dept", "c1", "c0",
                 Predicate.Op.EQUALS));
+//        nodes.add(new LogicalJoinNode("dept", "emp", "c0", "c1",
+//                Predicate.Op.EQUALS));
         nodes.add(new LogicalJoinNode("emp", "hobbies", "c2", "c0",
                 Predicate.Op.EQUALS));
+
+//        List<LogicalJoinNode> nodes2 = new ArrayList<>();
+//        nodes2.add(new LogicalJoinNode("dept", "emp", "c0", "c1",
+//                Predicate.Op.EQUALS));
+//
+        for (LogicalJoinNode i : nodes) {
+            System.out.println(i);
+        }
         Parser p = new Parser();
         j = new JoinOptimizer(
                 p.generateLogicalPlan(
                         tid,
-                        "SELECT * FROM emp,dept,hobbies,hobby WHERE emp.c1 = dept.c0 AND hobbies.c0 = emp.c2 AND hobbies.c1 = hobby.c0 AND e.c3 < 1000;"),
+                        "SELECT * FROM emp,dept,hobbies,hobby WHERE emp.c1 = dept.c0 AND hobbies.c0 = emp.c2 AND hobbies.c1 = hobby.c0 AND emp.c3 < 1000;"),
                 nodes);
+//        j = new JoinOptimizer(
+//                p.generateLogicalPlan(
+//                        tid,
+//                        "SELECT * FROM emp,dept WHERE emp.c1 = dept.c0 and emp.c3 < 1000;"),
+//                nodes2);
 
         // Set the last boolean here to 'true' in order to have orderJoins()
         // print out its logic
-        result = j.orderJoins(stats, filterSelectivities, false);
+        Set<Set<LogicalJoinNode>> sets = j.enumerateSubsets(nodes, 2);
+        System.out.println(sets);
+        System.out.println(j.estimateJoinCost(joinNode, card1, card2, cost1, cost2));
+        System.out.println(j.estimateJoinCost(joinNode, 20000, 1000, 40097, 606));
+        result = j.orderJoins(stats, filterSelectivities, true);
+        Set<LogicalJoinNode> set = new HashSet<>();
+//        set.add(new LogicalJoinNode("hobbies", "hobby", "c1", "c0",
+//                Predicate.Op.EQUALS));
+//        set.add(new LogicalJoinNode("emp", "hobbies", "c2", "c0",
+//                Predicate.Op.EQUALS));
+
+        set.add(new LogicalJoinNode("emp", "dept", "c1", "c0",
+                Predicate.Op.EQUALS));
+
+
+        System.out.println("fuck" + j.pc.getOrder(set));
+        System.out.println("fuck" + j.pc.getCost(set));
+        for (LogicalJoinNode i : result) {
+            System.out.println(i);
+        }
 
         // There are only three join nodes; if you're only re-ordering the join
         // nodes,
@@ -437,6 +489,8 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         }
         HeapFile bigHeapFile = createDuplicateHeapFile(bigHeapFileTuples, 2,
                 "c");
+        System.out.println("bigfile pages" + bigHeapFile.numPages());
+        System.out.println("small file pages: " + smallHeapFileA.numPages());
         Database.getCatalog().addTable(bigHeapFile, "bigTable");
 
         // Add the tables to the database
@@ -491,6 +545,8 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         filterSelectivities.put("n", 1.0);
 
         // Add the nodes to a collection for a query plan
+        nodes.add(new LogicalJoinNode("n", "bigTable", "c0", "c0",
+                Predicate.Op.EQUALS));
         nodes.add(new LogicalJoinNode("a", "b", "c1", "c1", Predicate.Op.EQUALS));
         nodes.add(new LogicalJoinNode("b", "c", "c0", "c0", Predicate.Op.EQUALS));
         nodes.add(new LogicalJoinNode("c", "d", "c1", "c1", Predicate.Op.EQUALS));
@@ -504,8 +560,11 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         nodes.add(new LogicalJoinNode("k", "l", "c1", "c1", Predicate.Op.EQUALS));
         nodes.add(new LogicalJoinNode("l", "m", "c0", "c0", Predicate.Op.EQUALS));
         nodes.add(new LogicalJoinNode("m", "n", "c1", "c1", Predicate.Op.EQUALS));
-        nodes.add(new LogicalJoinNode("n", "bigTable", "c0", "c0",
-                Predicate.Op.EQUALS));
+
+        System.out.println("before ordering");
+        System.out.println(nodes);
+        System.out.println("after ordering");
+
 
         // Make sure we don't give the nodes to the optimizer in a nice order
         Collections.shuffle(nodes);
@@ -518,11 +577,51 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
 
         // Set the last boolean here to 'true' in order to have orderJoins()
         // print out its logic
+        LogicalJoinNode hAndI = new LogicalJoinNode("h", "i", "c0", "c0", Predicate.Op.EQUALS);
+        double t1cost, t2cost;
+        int t1card, t2card;
+        t1cost = stats.get("h").estimateScanCost();
+        t2cost = stats.get("i").estimateScanCost();
+        t1card = stats.get("h").estimateTableCardinality(filterSelectivities.get("h"));
+        t2card = stats.get("i").estimateTableCardinality(filterSelectivities.get("i"));
+
+        System.out.println("table h scan cost: " + t1cost);
+        System.out.println("table i scan cost: " + t2cost);
+        System.out.println("table h card: " + t1card);
+        System.out.println("table i card: " + t2card);
+
+        double a = j.estimateJoinCost(hAndI, t1card, t2card, t1cost, t2cost);
+        double cost2 = j.estimateJoinCost(hAndI, t2card, t1card, t2cost, t1cost);
+
+        System.out.println("hAndi:" + a);
+        System.out.println("i and h: " + cost2);
+
+
+        t1cost = stats.get("n").estimateScanCost();
+        t2cost = stats.get("bigTable").estimateScanCost();
+        t1card = stats.get("n").estimateTableCardinality(filterSelectivities.get("n"));
+        t2card = stats.get("bigTable").estimateTableCardinality(filterSelectivities.get("bigTable"));
+
+        System.out.println("table n scan cost: " + t1cost);
+        System.out.println("bigTable scan cost: " + t2cost);
+        System.out.println("table n card: " + t1card);
+        System.out.println("bigTable card: " + t2card);
+
+
+         a = j.estimateJoinCost(hAndI, t1card, t2card, t1cost, t2cost);
+         cost2 = j.estimateJoinCost(hAndI, t2card, t1card, t2cost, t1cost);
+
+        System.out.println(a);
+        System.out.println(cost2);
+
+
+
         result = j.orderJoins(stats, filterSelectivities, false);
 
         // If you're only re-ordering the join nodes,
         // you shouldn't end up with more than you started with
         Assert.assertEquals(result.size(), nodes.size());
+        System.out.println(result);
 
         // Make sure that "bigTable" is the outermost table in the join
         Assert.assertEquals(result.get(result.size() - 1).t2Alias, "bigTable");
@@ -629,4 +728,11 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
         Assert.assertTrue(result.get(result.size() - 1).t2Alias.equals("a")
                 || result.get(result.size() - 1).t1Alias.equals("a"));
     }
+
+
+    @Test public void toStrintest() {
+
+    }
+
+
 }
