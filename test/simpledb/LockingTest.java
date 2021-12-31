@@ -8,13 +8,14 @@ import junit.framework.JUnit4TestAdapter;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.Utility;
-import simpledb.storage.BufferPool;
-import simpledb.storage.HeapPageId;
-import simpledb.storage.PageId;
+import simpledb.storage.*;
 import simpledb.transaction.TransactionId;
 
+import java.util.List;
+import java.util.Map;
+
 public class LockingTest extends TestUtil.CreateHeapFile {
-  private PageId p0;
+   private PageId p0;
     private PageId p1;
     private TransactionId tid1, tid2;
 
@@ -108,6 +109,7 @@ public class LockingTest extends TestUtil.CreateHeapFile {
    * Acquires two read locks on the same page.
    */
   @Test public void acquireReadLocksOnSamePage() throws Exception {
+//    System.out.println(LockManager.getInstance().acquireLock(tid1, p0, LockType.SHARED_LOCK));
     metaLockTester(tid1, p0, Permissions.READ_ONLY,
                    tid2, p0, Permissions.READ_ONLY, true);
   }
@@ -191,6 +193,19 @@ public class LockingTest extends TestUtil.CreateHeapFile {
     bp.getPage(tid2, p1, Permissions.READ_WRITE);
     bp.unsafeReleasePage(tid2, p1);
     bp.getPage(tid1, p1, Permissions.READ_WRITE);
+  }
+
+  @Test public void myTest() throws Exception{
+    LockManager lockManager = LockManager.getInstance();
+    TransactionId id = new TransactionId();
+    bp = Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
+    System.out.println(bp.getPage(id, p0, Permissions.READ_ONLY));
+    bp.getPage(id, p1, Permissions.READ_ONLY);
+//    Map<TransactionId, List<PageId>> map = lockManager.getTxnMap();
+//    List<PageId> l = map.get(id);
+//    System.out.println(l.size());
+//    for (PageId pid : l) System.out.println(id);
+   // System.out.println(l.size());
   }
 
   /**

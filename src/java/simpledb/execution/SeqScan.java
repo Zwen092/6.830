@@ -1,6 +1,5 @@
 package simpledb.execution;
 
-import org.junit.Test;
 import simpledb.common.Database;
 import simpledb.storage.DbFile;
 import simpledb.transaction.TransactionAbortedException;

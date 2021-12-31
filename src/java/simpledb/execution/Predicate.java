@@ -1,6 +1,5 @@
 package simpledb.execution;
 
-import org.junit.Test;
 import simpledb.storage.Field;
 import simpledb.storage.Tuple;
 

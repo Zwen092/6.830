@@ -97,6 +97,8 @@ public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
         	HeapPage p = (HeapPage) Database.getBufferPool().getPage(tid, t.getRecordId().getPageId(), Permissions.READ_ONLY);
         	assertEquals(504-i-1, p.getNumEmptySlots());
         }
+
+
     }
     
     /**

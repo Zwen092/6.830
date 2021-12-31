@@ -24,12 +24,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Threadsafe, all fields are final
  */
 public class BufferPool {
-    /** Bytes per page, including header. */
+//    /** Bytes per page, including header. */
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
-    
-    /** Default number of pages passed to the constructor. This is used by
+
+    /** Default number of perages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
@@ -65,16 +65,16 @@ public class BufferPool {
         sentinel.next = sentinel;
         sentinel.prev = sentinel;
     }
-    
+
     public static int getPageSize() {
       return pageSize;
     }
-    
+
     // THIS FUNCTION SHOULD ONLY BE USED FOR TESTING!!
     public static void setPageSize(int pageSize) {
     	BufferPool.pageSize = pageSize;
     }
-    
+
     // THIS FUNCTION SHOULD ONLY BE USED FOR TESTING!!
     public static void resetPageSize() {
     	BufferPool.pageSize = DEFAULT_PAGE_SIZE;
@@ -101,19 +101,20 @@ public class BufferPool {
         throws TransactionAbortedException, DbException {
         // some code goes here
         dNode node = bufferPool.get(pid);
+        boolean acquired = false;
+        LockType lockType = perm == Permissions.READ_ONLY ? LockType.SHARED_LOCK : LockType.EXCLUSIVE_LOCK;
+        acquired = LockManager.getInstance().acquireLock(tid, pid, lockType);
+        //todo::a simple but bogus implementation of block, need improvement
+        if (!acquired) {
+            try {
+                Thread.sleep(101);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         if (node == null) {
             DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             Page page = dbFile.readPage(pid);
-//            if (page != null) {
-////                if (bufferPool.size() >= this.numPages) {
-////                    this.evictPage();
-////                }
-//////                if (perm == Permissions.READ_WRITE) {
-//////                    page.markDirty(true, tid);
-//////                }
-////                dNode newNode =
-////                bufferPool.put(pid, page);
-//            }
             node = new dNode(pid, page);
             bufferPool.put(pid, node);
             addToHead(node);
@@ -134,18 +135,21 @@ public class BufferPool {
 
     private void moveToHead(dNode node) {
         //move this node to head
-        node.prev.next = node.next;
-        node.next.prev = node.prev;
+        removeNode(node);
         node.prev = sentinel;
         node.next = sentinel.next;
         sentinel.next.prev = node;
         sentinel.next = node;
     }
 
+    private void removeNode(dNode node) {
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+    }
+
     private dNode removeTail() {
         dNode tail = sentinel.prev;
-        tail.prev.next = tail.next;
-        sentinel.prev = tail.prev;
+        removeNode(tail);
         return tail;
     }
 
@@ -154,13 +158,14 @@ public class BufferPool {
      * Calling this is very risky, and may result in wrong behavior. Think hard
      * about who needs to call this and why, and why they can run the risk of
      * calling it.
-     *
+     * answer: the transaction calls this method before it commit, which may cause synchronized issue
      * @param tid the ID of the transaction requesting the unlock
      * @param pid the ID of the page to unlock
      */
-    public  void unsafeReleasePage(TransactionId tid, PageId pid) {
+    public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        LockManager.getInstance().releaseLock(tid, pid);
     }
 
     /**
@@ -171,13 +176,14 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
         // some code goes here
         // not necessary for lab1|lab2
-        return false;
+        return LockManager.getInstance().holdsLock(tid, p);
     }
 
     /**
@@ -190,18 +196,25 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
+        if (commit) {
+            //flush all dirty pages related to this tid
+
+        } else {
+            //revert any changes made by this transaction
+        }
+        //release all locks the transaction is holding
     }
 
     /**
      * Add a tuple to the specified table on behalf of transaction tid.  Will
-     * acquire a write lock on the page the tuple is added to and any other 
-     * pages that are updated (Lock acquisition is not needed for lab2). 
+     * acquire a write lock on the page the tuple is added to and any other
+     * pages that are updated (Lock acquisition is not needed for lab2).
      * May block if the lock(s) cannot be acquired.
-     * 
+     *
      * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have 
-     * been dirtied to the cache (replacing any existing versions of those pages) so 
-     * that future requests see up-to-date pages. 
+     * their markDirty bit, and adds versions of any pages that have
+     * been dirtied to the cache (replacing any existing versions of those pages) so
+     * that future requests see up-to-date pages.
      *
      * @param tid the transaction adding the tuple
      * @param tableId the table to add the tuple to
@@ -226,9 +239,9 @@ public class BufferPool {
      * other pages that are updated. May block if the lock(s) cannot be acquired.
      *
      * Marks any pages that were dirtied by the operation as dirty by calling
-     * their markDirty bit, and adds versions of any pages that have 
-     * been dirtied to the cache (replacing any existing versions of those pages) so 
-     * that future requests see up-to-date pages. 
+     * their markDirty bit, and adds versions of any pages that have
+     * been dirtied to the cache (replacing any existing versions of those pages) so
+     * that future requests see up-to-date pages.
      *
      * @param tid the transaction deleting the tuple.
      * @param t the tuple to delete
@@ -266,7 +279,7 @@ public class BufferPool {
         Needed by the recovery manager to ensure that the
         buffer pool doesn't keep a rolled back page in its
         cache.
-        
+
         Also used by B+ tree files to ensure that deleted pages
         are removed from the cache so they can be reused safely
     */
@@ -316,24 +329,28 @@ public class BufferPool {
      */
     private synchronized void evictPage() throws DbException {
 
-        dNode tail = removeTail();
-        bufferPool.remove(tail.pageId);
-        size--;
-        if (tail.page.isDirty() != null) {
-            try {
-                flushPage(tail.pageId);
-            } catch (IOException e) {
-                e.printStackTrace();
+//        dNode tail = removeTail();
+//        bufferPool.remove(tail.pageId);
+//        size--;
+//        if (tail.page.isDirty() != null) {
+//            try {
+//                flushPage(tail.pageId);
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+
+        for (dNode tail = sentinel.prev; tail != sentinel; tail = tail.prev) {
+            if (tail.page.isDirty() == null) {
+                removeNode(tail);
+                bufferPool.remove(tail.pageId);
+                size--;
+                //deal with the locks holding by the transaction
+                LockManager.getInstance().releaseLocksOnaPage(tail.pageId);
+                return;
             }
         }
+        //all pages are dirty
+        throw new DbException("All pages are dirty, couldn't evict any page");
     }
-
-    /**
-     *
-     *
-     */
-    private void put(PageId pageId, Page page) {
-
-    }
-
 }
