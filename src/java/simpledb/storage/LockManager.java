@@ -8,6 +8,8 @@ import sun.misc.Lock;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -30,57 +32,61 @@ public class LockManager {
     }
 
     private final Map<PageId, List<Lock>> lockMap;
-    private final Map<TransactionId, List<PageId>> txnMap;
-    private static final LockManager lockManager = new LockManager();
 
-    private LockManager() {
+    public LockManager() {
         lockMap = new ConcurrentHashMap<>();
-        txnMap = new ConcurrentHashMap<>();
     }
 
-    public static LockManager getInstance() {
-        return lockManager;
-    }
-
-    public Map<TransactionId, List<PageId>> getTxnMap() {
-        return txnMap;
-    }
 
     //todo::this method may be synchronized
-    public boolean acquireLock(TransactionId tid, PageId pageId, LockType lockType) {
+    public synchronized boolean acquireLock(TransactionId tid, PageId pageId, LockType lockType) {
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
         if (lockMap.get(pageId) == null) {
             //no lock in this page, grant it
             Lock lock = new Lock(tid, lockType);
             List<Lock> locks = new ArrayList<>();
             locks.add(lock);
             lockMap.put(pageId, locks);
-            //trackTransactionIdAndPageId(tid, pageId);
             return true;
         }
+        List<Lock> locks = lockMap.get(pageId);
         /*
         one transaction repeatedly request the lock on the same page, may lead to lock upgrade or fail
          */
-        for (Lock lock : lockMap.get(pageId)) {
+        for (Lock lock : locks) {
             if (lock.transactionId == tid) {
-                //if there's only one transaction holding a shared lock, upgrade it
-                if (lock.lockType == LockType.SHARED_LOCK && lockMap.get(pageId).size() == 1) {
-                    lock.lockType = LockType.EXCLUSIVE_LOCK;
-                    //return true;
+                //same lock, grant
+                if (lock.lockType == lockType) {
+                    return true;
                 }
-                return true;
+                //exclusive lock, grant
+                if (lock.lockType == LockType.EXCLUSIVE_LOCK) {
+                    return true;
+                }
+                //shared lock with size = 1, upgrade
+                if (locks.size() == 1) {
+                    lock.lockType = LockType.EXCLUSIVE_LOCK;
+                    return true;
+                } else {
+                    //shared lock, size != 1, requesting xLock, reject
+                    return false;
+                }
+
+
+
             }
         }
         /*
         another transaction coming to request a lock on the same page
          */
-        List<Lock> locks = lockMap.get(pageId);
+
         if (locks.size() == 1 && locks.get(0).lockType == LockType.EXCLUSIVE_LOCK)
             return false;
         else {
             if (lockType == LockType.SHARED_LOCK) {
                 Lock newLock = new Lock(tid, lockType);
                 locks.add(newLock);
-                //trackTransactionIdAndPageId(tid, pageId);
                 return true;
             } else {
                 return false;
@@ -88,22 +94,17 @@ public class LockManager {
         }
     }
 
-    private void trackTransactionIdAndPageId(TransactionId tid, PageId pid) {
-        if (txnMap.get(tid) == null) {
-            List<PageId> pageIdList = new ArrayList<>();
-            pageIdList.add(pid);
-            txnMap.put(tid, pageIdList);
-        } else {
-            txnMap.get(tid).add(pid);
-        }
-    }
+    public synchronized void releaseLock(TransactionId tid, PageId pid) {
+        List<Lock> l = lockMap.get(pid);
+        Iterator<Lock> iterator = l.iterator();
 
-    public void releaseLock(TransactionId tid, PageId pid) {
-        Iterator<Lock> iterator = lockMap.get(pid).iterator();
         while (iterator.hasNext()) {
-            Lock l = iterator.next();
-            if (l.transactionId == tid) {
+            Lock lock = iterator.next();
+            if (lock.transactionId == tid) {
                 iterator.remove();
+                if (l.size() == 0) {
+                    releaseLocksOnaPage(pid);
+                }
                 return;
             }
         }
@@ -113,7 +114,7 @@ public class LockManager {
         lockMap.remove(pageId);
     }
 
-    public boolean holdsLock(TransactionId tid, PageId p) {
+    public synchronized boolean holdsLock(TransactionId tid, PageId p) {
         if (lockMap.get(p) == null)
             return false;
         for (Lock lock : lockMap.get(p)) {
@@ -123,9 +124,4 @@ public class LockManager {
         return false;
     }
 
-
-
-    private boolean canGetLock() {
-        return false;
-    }
 }

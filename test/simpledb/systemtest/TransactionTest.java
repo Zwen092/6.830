@@ -9,6 +9,9 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.junit.Test;
 
@@ -98,6 +101,7 @@ public class TransactionTest extends SimpleDbTestBase {
                     // Wait for all threads to be ready
                     latch.await();
                     Transaction tr = new Transaction();
+                    System.out.println(tr.getId());
                     try {
                         tr.start();
                         SeqScan ss1 = new SeqScan(tr.getId(), tableId, "");
@@ -115,7 +119,7 @@ public class TransactionTest extends SimpleDbTestBase {
                         Tuple t = new Tuple(SystemTestUtil.SINGLE_INT_DESCRIPTOR);
                         t.setField(0, new IntField(i+1));
 
-                        // sleep to get some interesting thread interleavings
+                        // sleep to get some interesting thread interleaving
                         Thread.sleep(1);
 
                         // race the other threads to finish the transaction: one will win
@@ -145,8 +149,9 @@ public class TransactionTest extends SimpleDbTestBase {
                         tr.commit();
                         break;
                     } catch (TransactionAbortedException te) {
-                        //System.out.println("thread " + tr.getId() + " killed");
+                        System.out.println("thread " + tr.getId() + " killed");
                         // give someone else a chance: abort the transaction
+                        //System.out.println("fuck abort!");
                         tr.transactionComplete(true);
                         latch.stillParticipating();
                     }
@@ -158,6 +163,7 @@ public class TransactionTest extends SimpleDbTestBase {
             }
             
             try {
+                System.out.println("waiting");
                 latch.notParticipating();
             } catch (InterruptedException | BrokenBarrierException e) {
                 throw new RuntimeException(e);
@@ -255,8 +261,22 @@ public class TransactionTest extends SimpleDbTestBase {
         t.commit();
     }
 
+    @Test public void myTest() {
+        Lock lock = new ReentrantLock(false);
+
+        System.out.println(System.currentTimeMillis());
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println(System.currentTimeMillis());
+
+    }
+
     /** Make test compatible with older version of ant. */
     public static junit.framework.Test suite() {
         return new junit.framework.JUnit4TestAdapter(TransactionTest.class);
     }
 }
+

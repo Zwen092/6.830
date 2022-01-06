@@ -74,6 +74,11 @@ public class RecordId implements Serializable {
 
     }
 
+    @Override
+    public String toString() {
+        return "pageId: " + pageId + " " + "tupleNo: " + tupleNo;
+    }
+
 
 
 

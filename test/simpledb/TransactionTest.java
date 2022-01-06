@@ -118,6 +118,7 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
     testTransactionComplete(false);
   }
 
+
   /**
    * JUnit suite target
    */

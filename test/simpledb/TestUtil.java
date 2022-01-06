@@ -376,7 +376,6 @@ public class TestUtil {
         protected CreateHeapFile() {
             try{
                 emptyFile = File.createTempFile("empty", ".dat");
-                System.out.println("empty file created");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

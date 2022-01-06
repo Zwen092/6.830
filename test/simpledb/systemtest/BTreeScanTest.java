@@ -1,5 +1,6 @@
 package simpledb.systemtest;
 
+import com.sun.rowset.internal.Row;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 
@@ -87,6 +88,12 @@ public class BTreeScanTest extends SimpleDbTestBase {
         int[] rowSizes =
                 new int[]{0, 1, 2, 511, 512, 513, 1023, 1024, 1025, 4096 + r.nextInt(4096)};
         validateScan(columnSizes, rowSizes);
+    }
+
+    @Test public void testLarge() throws IOException, DbException, TransactionAbortedException {
+        int[] coSize = new int[]{10, 15, 20, 25};
+        int[] roSize = new int[]{512, 1024, 2048, 4096, 8192 + r.nextInt(4096)};
+        validateScan(coSize, roSize);
     }
 
     /** Test that rewinding a BTreeScan iterator works. */

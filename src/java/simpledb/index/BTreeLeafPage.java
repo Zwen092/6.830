@@ -471,7 +471,7 @@ public class BTreeLeafPage extends BTreePage {
 		int headerbit = i % 8;
 		int headerbyte = (i - headerbit) / 8;
 
-		Debug.log(1, "BTreeLeafPage.setSlot: setting slot %d to %b", i, value);
+		//Debug.log(1, "BTreeLeafPage.setSlot: setting slot %d to %b", i, value);
 		if(value)
 			header[headerbyte] |= 1 << headerbit;
 		else

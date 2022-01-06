@@ -50,6 +50,7 @@ public class BufferPool {
     int size;
     dNode sentinel = new dNode();
     int numPages;
+    private LockManager lockManager;
 
 
     //I may use a map to track the
@@ -64,6 +65,7 @@ public class BufferPool {
         this.size = 0;
         sentinel.next = sentinel;
         sentinel.prev = sentinel;
+        lockManager = new LockManager();
     }
 
     public static int getPageSize() {
@@ -103,28 +105,42 @@ public class BufferPool {
         dNode node = bufferPool.get(pid);
         boolean acquired = false;
         LockType lockType = perm == Permissions.READ_ONLY ? LockType.SHARED_LOCK : LockType.EXCLUSIVE_LOCK;
-        acquired = LockManager.getInstance().acquireLock(tid, pid, lockType);
-        //todo::a simple but bogus implementation of block, need improvement
-        if (!acquired) {
-            try {
-                Thread.sleep(101);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+        long start = System.currentTimeMillis();
+        long timeOut = new Random().nextInt(1000) + 2000;
+        while (!acquired) {
+            long now = System.currentTimeMillis();
+            if (now - start > timeOut) {
+                //transactionComplete(tid, false);
+                throw new TransactionAbortedException();
             }
+            acquired = lockManager.acquireLock(tid, pid, lockType);
         }
         if (node == null) {
             DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             Page page = dbFile.readPage(pid);
             node = new dNode(pid, page);
-            bufferPool.put(pid, node);
-            addToHead(node);
+            put(pid, page);
+        }
+        return node.page;
+    }
+    private void put(PageId pid, Page page) {
+        dNode n = bufferPool.get(pid);
+        if (n == null) {
+            dNode newNode = new dNode(pid, page);
+            bufferPool.put(pid, newNode);
+            addToHead(newNode);
             size++;
             if (size > numPages) {
-                evictPage();
+                try {
+                    evictPage();
+                } catch (DbException e) {
+                    e.printStackTrace();
+                }
             }
+        } else {
+            n.page = page;
+            moveToHead(n);
         }
-        moveToHead(node);
-        return node.page;
     }
     private void addToHead(dNode node) {
         node.prev = sentinel;
@@ -165,7 +181,7 @@ public class BufferPool {
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
-        LockManager.getInstance().releaseLock(tid, pid);
+        lockManager.releaseLock(tid, pid);
     }
 
     /**
@@ -183,7 +199,7 @@ public class BufferPool {
     public boolean holdsLock(TransactionId tid, PageId p) {
         // some code goes here
         // not necessary for lab1|lab2
-        return LockManager.getInstance().holdsLock(tid, p);
+        return lockManager.holdsLock(tid, p);
     }
 
     /**
@@ -198,11 +214,16 @@ public class BufferPool {
         // not necessary for lab1|lab2
         if (commit) {
             //flush all dirty pages related to this tid
-
+            flushPages(tid);
         } else {
-            //revert any changes made by this transaction
+            //revert any changes made by this transaction by restoring the page to its on-disk state
+            restorePages(tid);
         }
         //release all locks the transaction is holding
+        for (PageId pid : bufferPool.keySet()) {
+            if (holdsLock(tid, pid))
+                unsafeReleasePage(tid, pid);
+        }
     }
 
     /**
@@ -227,9 +248,7 @@ public class BufferPool {
 
         for (Page dirtyPage : dirtyPages) {
             dirtyPage.markDirty(true, tid);
-            dNode node = new dNode(dirtyPage.getId(), dirtyPage);
-            this.bufferPool.put(dirtyPage.getId(), node);
-            addToHead(node);
+            put(dirtyPage.getId(), dirtyPage);
         }
     }
 
@@ -251,11 +270,11 @@ public class BufferPool {
         RecordId recordId = t.getRecordId();
         PageId pageId = recordId.getPageId();
         HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(pageId.getTableId());
-        heapFile.deleteTuple(tid, t);
-//        for (Page page : pages) {
-//            page.markDirty(true, tid);
-//            bufferPool.put(pageId, new dNode(page.getId(), page));
-//        }
+        ArrayList<Page> pages = heapFile.deleteTuple(tid, t);
+        for (Page page : pages) {
+            page.markDirty(true, tid);
+            put(pageId, page);
+        }
     }
 
     /**
@@ -296,26 +315,46 @@ public class BufferPool {
      * Flushes a certain page to disk
      * @param pid an ID indicating the page to flush
      */
-    private synchronized void flushPage(PageId pid) throws IOException {
+    private synchronized void flushPage(PageId pid)  {
         // some code goes here
         // not necessary for lab1
         Page pageToBeFlushed = bufferPool.get(pid).page;
         TransactionId tid = pageToBeFlushed.isDirty();
-        if (pageToBeFlushed != null && tid != null) {
-            Page before = pageToBeFlushed.getBeforeImage();
-            // flushPage本身无事务控制，不应该调用setBeforeImage
-            // pageToBeFlushed.setBeforeImage();
-            Database.getLogFile().logWrite(tid, before, pageToBeFlushed);
-            Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(pageToBeFlushed);
+        if (tid != null) {
+//            Page before = pageToBeFlushed.getBeforeImage();
+//            // flushPage本身无事务控制，不应该调用setBeforeImage
+//            // pageToBeFlushed.setBeforeImage();
+//            Database.getLogFile().logWrite(tid, before, pageToBeFlushed);
+            try {
+                Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(pageToBeFlushed);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     /** Write all pages of the specified transaction to disk.
      */
-    public synchronized void flushPages(TransactionId tid) throws IOException {
+    public synchronized void flushPages(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
+        for (PageId pid : bufferPool.keySet()) {
+            Page page = bufferPool.get(pid).page;
+            if (page.isDirty() == tid)
+                flushPage(pid);
+        }
+    }
+    public synchronized void restorePages(TransactionId tid) {
+        for (PageId pid : bufferPool.keySet()) {
+            Page page = bufferPool.get(pid).page;
 
+            if (page.isDirty() == tid) {
+                int tableId = pid.getTableId();
+                DbFile file = Database.getCatalog().getDatabaseFile(tableId);
+                Page pageFromDisk = file.readPage(pid);
+                put(pid, pageFromDisk);
+            }
+        }
     }
 
     /**
@@ -346,7 +385,7 @@ public class BufferPool {
                 bufferPool.remove(tail.pageId);
                 size--;
                 //deal with the locks holding by the transaction
-                LockManager.getInstance().releaseLocksOnaPage(tail.pageId);
+                lockManager.releaseLocksOnaPage(tail.pageId);
                 return;
             }
         }

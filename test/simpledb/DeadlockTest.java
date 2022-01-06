@@ -219,6 +219,7 @@ public class DeadlockTest extends TestUtil.CreateHeapFile {
     System.out.println("testUpgradeWriteDeadlock resolved deadlock");
   }
 
+
   /**
    * JUnit suite target
    */

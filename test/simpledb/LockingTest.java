@@ -11,6 +11,7 @@ import simpledb.common.Utility;
 import simpledb.storage.*;
 import simpledb.transaction.TransactionId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -196,16 +197,11 @@ public class LockingTest extends TestUtil.CreateHeapFile {
   }
 
   @Test public void myTest() throws Exception{
-    LockManager lockManager = LockManager.getInstance();
-    TransactionId id = new TransactionId();
-    bp = Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
-    System.out.println(bp.getPage(id, p0, Permissions.READ_ONLY));
-    bp.getPage(id, p1, Permissions.READ_ONLY);
-//    Map<TransactionId, List<PageId>> map = lockManager.getTxnMap();
-//    List<PageId> l = map.get(id);
-//    System.out.println(l.size());
-//    for (PageId pid : l) System.out.println(id);
-   // System.out.println(l.size());
+
+    ArrayList<Integer> l = new ArrayList<>();
+    l.add(1);
+    l.remove(0);
+    System.out.println(l.size());
   }
 
   /**

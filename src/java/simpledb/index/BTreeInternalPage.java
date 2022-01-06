@@ -566,6 +566,8 @@ public class BTreeInternalPage extends BTreePage {
 	 * Returns the number of entries (keys) currently stored on this page
 	 */
 	public int getNumEntries() {
+		//		this.numSlots = getMaxEntries() + 1;
+		//
 		return numSlots - getNumEmptySlots() - 1;
 	}
 	
@@ -598,7 +600,7 @@ public class BTreeInternalPage extends BTreePage {
 		int headerbit = i % 8;
 		int headerbyte = (i - headerbit) / 8;
 
-		Debug.log(1, "BTreeInternalPage.setSlot: setting slot %d to %b", i, value);
+		//Debug.log(1, "BTreeInternalPage.setSlot: setting slot %d to %b", i, value);
 		if(value)
 			header[headerbyte] |= 1 << headerbit;
 		else
@@ -635,11 +637,11 @@ public class BTreeInternalPage extends BTreePage {
 
 		try {
 			if(!isSlotUsed(i)) {
-				Debug.log(1, "BTreeInternalPage.getKey: slot %d in %d:%d is not used", i, pid.getTableId(), pid.getPageNumber());
+				//Debug.log(1, "BTreeInternalPage.getKey: slot %d in %d:%d is not used", i, pid.getTableId(), pid.getPageNumber());
 				return null;
 			}
 
-			Debug.log(1, "BTreeInternalPage.getKey: returning key %d", i);
+			//Debug.log(1, "BTreeInternalPage.getKey: returning key %d", i);
 			return keys[i];
 
 		} catch (ArrayIndexOutOfBoundsException e) {
@@ -660,11 +662,11 @@ public class BTreeInternalPage extends BTreePage {
 
 		try {
 			if(!isSlotUsed(i)) {
-				Debug.log(1, "BTreeInternalPage.getChildId: slot %d in %d:%d is not used", i, pid.getTableId(), pid.getPageNumber());
+				//Debug.log(1, "BTreeInternalPage.getChildId: slot %d in %d:%d is not used", i, pid.getTableId(), pid.getPageNumber());
 				return null;
 			}
 
-			Debug.log(1, "BTreeInternalPage.getChildId: returning child id %d", i);
+			//Debug.log(1, "BTreeInternalPage.getChildId: returning child id %d", i);
 			return new BTreePageId(pid.getTableId(), children[i], childCategory);
 
 		} catch (ArrayIndexOutOfBoundsException e) {

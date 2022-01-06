@@ -138,7 +138,7 @@ public abstract class BTreePage implements Page {
 	 * Returns the number of empty slots on this page.
 	 */
 	public abstract int getNumEmptySlots();
-	
+
 	/**
 	 * Returns true if associated slot on this page is filled.
 	 */

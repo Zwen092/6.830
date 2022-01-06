@@ -1,6 +1,7 @@
 package simpledb;
 
 import simpledb.common.Database;
+import simpledb.common.Debug;
 import simpledb.index.*;
 import simpledb.storage.*;
 import simpledb.systemtest.SimpleDbTestBase;
@@ -92,6 +93,7 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 		emptyFile.deleteOnExit();
 		Database.reset();
 		int entriesPerPage = BTreeUtility.getNumEntriesPerPage();
+		System.out.println("entriesPerPage:" + entriesPerPage);
 		BTreeFile empty = BTreeUtility.createEmptyBTreeFile(emptyFile.getAbsolutePath(), 2, 0, 3 + entriesPerPage);
 		int tableid = empty.getId();
 		int keyField = 0;
@@ -100,14 +102,17 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 		BTreePageId leftPageId = new BTreePageId(tableid, 2, BTreePageId.INTERNAL);
 		BTreeInternalPage leftPage = BTreeUtility.createRandomInternalPage(leftPageId, keyField, BTreePageId.LEAF,
 				0, BTreeUtility.MAX_RAND_VALUE, 3);
+		System.out.println("leftPage.getNumEntries()" + leftPage.getNumEntries());
 				
 		// create the parent page
 		BTreePageId parentId = new BTreePageId(tableid, 1, BTreePageId.INTERNAL);
 		BTreeInternalPage parent = new BTreeInternalPage(parentId, 
 				BTreeInternalPage.createEmptyPageData(), keyField);
+		System.out.println("parent.getNumEntries(): " + parent.getNumEntries());
 				
 		// set the pointers
 		leftPage.setParentId(parentId);
+		System.out.println("parent.getNumEntries(): " + parent.getNumEntries());
 		
 		Field field = new IntField(BTreeUtility.MAX_RAND_VALUE/2);
 		Map<PageId, Page> dirtypages = new HashMap<>();
@@ -127,12 +132,24 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 			assertTrue(field.compare(Op.GREATER_THAN_OR_EQ, 
 					otherPage.reverseIterator().next().getKey()));
 		}
-		
+		//hope both to be 251?
 		int totalEntries = page.getNumEntries() + otherPage.getNumEntries();
+		System.out.println("page entry: " + page.getNumEntries());
+		System.out.println("other page entry: " + otherPage.getNumEntries());
 		assertEquals(entriesPerPage - 1, totalEntries);
-		assertTrue(entriesPerPage/2 == page.getNumEntries() || 
+		/*
+		epp - 1 = 502
+		epp / 2 = 251
+		means pg.getnum = 251 || 250
+		and other pg.getnum = 251 || 250
+		means both page entry and other page entry should be 251
+		 */
+		BTreeChecker.checkRep(empty,
+				tid, dirtypages, true);
+		System.out.println("entriesPerPage/2 " + entriesPerPage/2 );
+		assertTrue(entriesPerPage/2 == page.getNumEntries() ||
 				entriesPerPage/2 - 1 == page.getNumEntries());
-		assertTrue(entriesPerPage/2 == otherPage.getNumEntries() || 
+		assertTrue(entriesPerPage/2 == otherPage.getNumEntries() ||
 				entriesPerPage/2 - 1 == otherPage.getNumEntries());
 	}    
 
