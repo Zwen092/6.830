@@ -1,6 +1,6 @@
 package simpledb.systemtest;
 
-import com.sun.rowset.internal.Row;
+
 import simpledb.common.Database;
 import simpledb.common.DbException;
 

@@ -14,6 +14,7 @@ import simpledb.transaction.TransactionId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LockingTest extends TestUtil.CreateHeapFile {
    private PageId p0;

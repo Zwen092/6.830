@@ -1,7 +1,5 @@
 package simpledb.storage;
 
-import jdk.nashorn.internal.runtime.RewriteException;
-import org.omg.IOP.TAG_ORB_TYPE;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Debug;

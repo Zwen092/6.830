@@ -269,48 +269,97 @@ public class BTreeFile implements DbFile {
         int half = page.getMaxTuples() / 2;
         shit code
          */
-        int half = page.getNumTuples() / 2;
-        BTreePageId rightSiblingId = page.getRightSiblingId();
-        BTreeLeafPage newPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
-        Iterator<Tuple> reverseIte = page.reverseIterator();
-        Tuple temp = null;
-        while (half > 0) {
-            temp = reverseIte.next();
-            page.deleteTuple(temp);
-            newPage.insertTuple(temp);
-            half--;
+//        int half = page.getNumTuples() / 2;
+//        BTreePageId rightSiblingId = page.getRightSiblingId();
+//        BTreeLeafPage newPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+//        Iterator<Tuple> reverseIte = page.reverseIterator();
+//        Tuple temp = null;
+//        while (half > 0) {
+//            temp = reverseIte.next();
+//            page.deleteTuple(temp);
+//            newPage.insertTuple(temp);
+//            half--;
+//        }
+
+        BTreeLeafPage newRightSib = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+        // copy half tuples
+        Iterator<Tuple> it = page.reverseIterator();
+        Tuple[] tupleToMove = new Tuple[(page.getNumTuples()+1) / 2];
+        int moveCnt = tupleToMove.length - 1;
+        while (moveCnt >= 0 && it.hasNext()) {
+            tupleToMove[moveCnt--] = it.next();
         }
 
+        for (int i = tupleToMove.length-1; i >= 0; --i) {
+            // t.getRecordId().getPageId().pageNumber();
+            page.deleteTuple(tupleToMove[i]);
+            newRightSib.insertTuple(tupleToMove[i]);
+        }
 
+        // assert newRightSib.getNumTuples() >= 1;
+        Field midkey = tupleToMove[0].getField(keyField);
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), midkey);
 
-        Field insertField = temp.getField(page.keyField);
-        //weather you split or not, I don't care
-        BTreeInternalPage parentPage = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), insertField);
+        BTreePageId oldRightSibId = page.getRightSiblingId();
 
+        newRightSib.setRightSiblingId(oldRightSibId);
+        newRightSib.setLeftSiblingId(page.getId());
+        page.setRightSiblingId(newRightSib.getId());
 
-        BTreeEntry entry = new BTreeEntry(insertField, page.getId(), newPage.getId());
-        //update the entry if needed
-        parentPage.insertEntry(entry);
+        // set up parent
+        newRightSib.setParentId(parent.getId());
+        page.setParentId(parent.getId());
 
-        //update the relevant sibling id
-        newPage.setLeftSiblingId(page.getId());
-        newPage.setRightSiblingId(rightSiblingId);
-        page.setRightSiblingId(newPage.getId());
+        // Leaf -> internal, copy to parent
+        BTreeEntry newParentEntry = new BTreeEntry(midkey, page.getId(), newRightSib.getId());
+        parent.insertEntry(newParentEntry);
+        // set dirtypages and old sibs
+        if (oldRightSibId != null) {
+            BTreeLeafPage oldRightSib = (BTreeLeafPage) getPage(tid, dirtypages, page.getRightSiblingId(), Permissions.READ_WRITE);
+            oldRightSib.setLeftSiblingId(newRightSib.getId());
+            dirtypages.put(oldRightSib.getId(), oldRightSib);
+        }
 
-        //update the newPage's parent
-        updateParentPointer(tid, dirtypages, parentPage.getId(), newPage.getId());
-
-        dirtypages.put(parentPage.getId(), parentPage);
+        dirtypages.put(parent.getId(), parent);
         dirtypages.put(page.getId(), page);
-        dirtypages.put(newPage.getId(), newPage);
+        dirtypages.put(newRightSib.getId(), newRightSib);
 
-
-        //consider which page to return
-        if (field.compare(Op.GREATER_THAN_OR_EQ, temp.getField(page.keyField))) {
-            return newPage;
+        if (field.compare(Op.GREATER_THAN_OR_EQ, midkey)) {
+            return newRightSib;
         } else {
             return page;
         }
+
+
+//        BTreePageId rightSiblingId = page.getRightSiblingId();
+//        Field insertField = tupleToMove[0].getField(page.keyField);
+//        //weather you split or not, I don't care
+//        BTreeInternalPage parentPage = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), insertField);
+//
+//
+//        BTreeEntry entry = new BTreeEntry(insertField, page.getId(), newPage.getId());
+//        //update the entry if needed
+//        parentPage.insertEntry(entry);
+//
+//        //update the relevant sibling id
+//        newPage.setLeftSiblingId(page.getId());
+//        newPage.setRightSiblingId(rightSiblingId);
+//        page.setRightSiblingId(newPage.getId());
+//
+//        //update the newPage's parent
+//        updateParentPointer(tid, dirtypages, parentPage.getId(), newPage.getId());
+//
+//        dirtypages.put(parentPage.getId(), parentPage);
+//        dirtypages.put(page.getId(), page);
+//        dirtypages.put(newPage.getId(), newPage);
+//
+//
+//        //consider which page to return
+//        if (field.compare(Op.GREATER_THAN_OR_EQ, insertField)) {
+//            return newPage;
+//        } else {
+//            return page;
+//        }
 //        BTreeLeafPage newRightSib = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
 //        // copy half tuples
 //        Iterator<Tuple> it = page.reverseIterator();

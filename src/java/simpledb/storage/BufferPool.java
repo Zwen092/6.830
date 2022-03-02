@@ -1,9 +1,6 @@
 package simpledb.storage;
 
-import simpledb.common.Database;
-import simpledb.common.Permissions;
-import simpledb.common.DbException;
-import simpledb.common.DeadlockException;
+import simpledb.common.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -11,6 +8,8 @@ import java.io.*;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+
+
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -51,6 +50,8 @@ public class BufferPool {
     dNode sentinel = new dNode();
     int numPages;
     private LockManager lockManager;
+
+
 
 
     //I may use a map to track the
@@ -107,6 +108,7 @@ public class BufferPool {
         LockType lockType = perm == Permissions.READ_ONLY ? LockType.SHARED_LOCK : LockType.EXCLUSIVE_LOCK;
         long start = System.currentTimeMillis();
         long timeOut = new Random().nextInt(1000) + 2000;
+
         while (!acquired) {
             long now = System.currentTimeMillis();
             if (now - start > timeOut) {
@@ -115,6 +117,7 @@ public class BufferPool {
             }
             acquired = lockManager.acquireLock(tid, pid, lockType);
         }
+        Debug.log("grant");
         if (node == null) {
             DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             Page page = dbFile.readPage(pid);
@@ -220,10 +223,8 @@ public class BufferPool {
             restorePages(tid);
         }
         //release all locks the transaction is holding
-        for (PageId pid : bufferPool.keySet()) {
-            if (holdsLock(tid, pid))
-                unsafeReleasePage(tid, pid);
-        }
+        lockManager.releaseAllLocks(tid);
+
     }
 
     /**
@@ -311,6 +312,10 @@ public class BufferPool {
         bufferPool.remove(pid);
     }
 
+    public synchronized void test() {
+        System.out.println("fuck");
+    }
+
     /**
      * Flushes a certain page to disk
      * @param pid an ID indicating the page to flush
@@ -319,13 +324,15 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
         Page pageToBeFlushed = bufferPool.get(pid).page;
-        TransactionId tid = pageToBeFlushed.isDirty();
-        if (tid != null) {
+        TransactionId dirty = pageToBeFlushed.isDirty();
+        if (dirty != null) {
 //            Page before = pageToBeFlushed.getBeforeImage();
 //            // flushPage本身无事务控制，不应该调用setBeforeImage
 //            // pageToBeFlushed.setBeforeImage();
 //            Database.getLogFile().logWrite(tid, before, pageToBeFlushed);
             try {
+                Database.getLogFile().logWrite(dirty, pageToBeFlushed.getBeforeImage(), pageToBeFlushed);
+                Database.getLogFile().force();
                 Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(pageToBeFlushed);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -340,8 +347,10 @@ public class BufferPool {
         // not necessary for lab1|lab2
         for (PageId pid : bufferPool.keySet()) {
             Page page = bufferPool.get(pid).page;
-            if (page.isDirty() == tid)
+            page.setBeforeImage();
+            if (page.isDirty() == tid) {
                 flushPage(pid);
+            }
         }
     }
     public synchronized void restorePages(TransactionId tid) {

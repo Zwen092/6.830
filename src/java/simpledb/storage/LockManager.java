@@ -1,17 +1,10 @@
 package simpledb.storage;
 
-import com.sun.javaws.ui.ApplicationIconGenerator;
-import simpledb.common.DbException;
-import simpledb.common.Permissions;
+import simpledb.common.Debug;
 import simpledb.transaction.TransactionId;
-import sun.misc.Lock;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author zwen
@@ -33,14 +26,16 @@ public class LockManager {
 
     private final Map<PageId, List<Lock>> lockMap;
 
+    private final Map<TransactionId, PageId> transactionIdPageIdMap;
+
     public LockManager() {
         lockMap = new ConcurrentHashMap<>();
+        transactionIdPageIdMap = new ConcurrentHashMap<>();
     }
 
 
     //todo::this method may be synchronized
     public synchronized boolean acquireLock(TransactionId tid, PageId pageId, LockType lockType) {
-        ExecutorService executor = Executors.newFixedThreadPool(3);
 
         if (lockMap.get(pageId) == null) {
             //no lock in this page, grant it
@@ -48,6 +43,7 @@ public class LockManager {
             List<Lock> locks = new ArrayList<>();
             locks.add(lock);
             lockMap.put(pageId, locks);
+            transactionIdPageIdMap.put(tid, pageId);
             return true;
         }
         List<Lock> locks = lockMap.get(pageId);
@@ -87,6 +83,7 @@ public class LockManager {
             if (lockType == LockType.SHARED_LOCK) {
                 Lock newLock = new Lock(tid, lockType);
                 locks.add(newLock);
+                transactionIdPageIdMap.put(tid, pageId);
                 return true;
             } else {
                 return false;
@@ -110,7 +107,16 @@ public class LockManager {
         }
     }
 
+    public synchronized void releaseAllLocks(TransactionId tid) {
+        for (Map.Entry<PageId, List<Lock>> entry : lockMap.entrySet()) {
+            PageId pageId = entry.getKey();
+            if (holdsLock(tid, pageId))
+                releaseLock(tid, pageId);
+        }
+    }
+
     public void releaseLocksOnaPage(PageId pageId) {
+
         lockMap.remove(pageId);
     }
 
